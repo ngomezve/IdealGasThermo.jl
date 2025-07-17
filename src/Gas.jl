@@ -1,4 +1,5 @@
 abstract type AbstractGas end
+
 """
     Gas{N}
 
@@ -331,36 +332,19 @@ with composition:
 """
 function set_h!(gas::AbstractGas, hspec::Float64)
     T = gas.T
-    dT = T
 
-    itermax = 20
-    for i = 1:itermax # abs(dT) > ϵ
-        res = gas.h - hspec # Residual
-        res_t = gas.cp  # ∂R/∂T = ∂h/∂T = cp
-        dT = -res / res_t # Newton step
-
-        if abs(dT) ≤ ϵ
-            break
-        end
-        #Prevent limit cycles if the iteration count is high
-        if i > itermax/2
-            dT = dT * i/itermax #Step can no longer be periodic
-        end
-        T = T + dT
-        gas.T = T
+    function h_residual(T)
+        gas.T = T[1]
+        return [gas.h - hspec]
     end
 
-    if abs(dT) > ϵ
-        error(
-            "Error: `set_h!` did not converge:\ngas=",
-            print(gas),
-            "\n\nabs(dT) = ",
-            abs(dT),
-            " > ϵ (",
-            ϵ,
-            ")",
-        )
+    function h_jacobian(T)
+        gas.T = T[1]
+        return [gas.cp]
     end
+
+    sol = nlsolve(h_residual, h_jacobian, [T], ftol = ϵ)
+    gas.T = sol.zero[1]
 
     return gas
 end
