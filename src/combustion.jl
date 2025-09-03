@@ -25,45 +25,37 @@ julia> IdealGasThermo.fuelbreakdown("CH3CH2OH")'
 
 ```
 """
-function fuelbreakdown(fuel::String)
-    C, H, O, N = 0.0, 0.0, 0.0, 0.0
-    if !isempty(findall(r"[^cChHoOnN.^[0-9]", fuel))
-        try
-            fuel = species_in_spdict(fuel).formula
-        catch e
-            if isa(e, ArgumentError)
-                error("""The input fuel string $fuel is not found in 
-                the thermo database and contains
-                elements other than C,H,O, and N.\n""")
-            end
+function fuelbreakdown(fuel::species)
+    formula = fuel.formula
+    C = H = N = O = 0.0
+    i = 1
+    while i <= lastindex(formula)
+        sym = formula[i]        # element symbol
+        i += 1
+        j = i
+        # consume number (digits + decimal point)
+        while j <= lastindex(formula) && (formula[j] in '0':'9' || formula[j] == '.')
+            j += 1
         end
-    end
-    chunks = [fuel[idx] for idx in findall(r"[a-zA-Z][a-z]?\d*\.?\d*", fuel)]
-    for chunk in chunks
-        element, number = match(r"([a-zA-Z][a-z]?)(\d*\.?\d*)", chunk).captures
-        element = uppercase(element)
-        if isempty(number)
-            number = 1
-        else
-            number = parse(Float64, number)
-        end
-        if element == "C"
-            C = C + number
-        elseif element == "H"
-            H = H + number
-        elseif element == "O"
-            O = O + number
-        elseif element == "N"
-            N = N + number
+        # substring [i:j-1] is the numeric part
+        val = (j > i) ? parse(Float64, @view formula[i:j-1]) : 1.0
+        if sym == 'C'
+            C = val
+        elseif sym == 'H'
+            H = val
+        elseif sym == 'N'
+            N = val
+        elseif sym == 'O'
+            O = val
         else
             error("Fuel can only contain C, H, O or N atoms!")
         end
+        i = j
     end
     return ([C, H, O, N])
-
 end
 
-fuelbreakdown(fuel::species) = fuelbreakdown(fuel.formula)
+fuelbreakdown(fuel::String) = fuelbreakdown(species_in_spdict(fuel))
 
 """
     reaction_change_fraction(fuel::String)
